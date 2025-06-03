@@ -1,0 +1,79 @@
+{
+  "title": "Security+ Practice Quiz",
+  "description": "Test your cybersecurity knowledge with these Security+ exam questions",
+  "questions": [
+    {
+      "id": 1,
+      "question": "What is the main purpose of a firewall?",
+      "options": [
+        "To encrypt data",
+        "To block physical access",
+        "To monitor and filter network traffic",
+        "To scan for malware"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "id": 2,
+      "question": "Which type of malware is designed to demand payment from the victim?",
+      "options": ["Worm", "Ransomware", "Trojan", "Spyware"],
+      "correctAnswer": 1
+    },
+    {
+      "id": 3,
+      "question": "What does CIA stand for in cybersecurity?",
+      "options": [
+        "Central Intelligence Agency",
+        "Confidentiality, Integrity, Availability",
+        "Code Injection Analysis",
+        "Cybersecurity Information Association"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "id": 4,
+      "question": "What is the strongest form of user authentication?",
+      "options": [
+        "Username and password",
+        "Two-factor authentication",
+        "Security questions",
+        "Email verification"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "id": 5,
+      "question": "Which protocol is used for secure web browsing?",
+      "options": ["HTTP", "FTP", "HTTPS", "SMTP"],
+      "correctAnswer": 2
+    },
+    {
+      "id": 6,
+      "question": "What is a zero-day vulnerability?",
+      "options": [
+        "A vulnerability that has been patched",
+        "A vulnerability discovered but not yet patched",
+        "A vulnerability that affects zero systems",
+        "A vulnerability that takes zero days to exploit"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "id": 7,
+      "question": "Which of the following is NOT a type of social engineering attack?",
+      "options": ["Phishing", "Pretexting", "DDoS", "Baiting"],
+      "correctAnswer": 2
+    },
+    {
+      "id": 8,
+      "question": "What does VPN stand for?",
+      "options": [
+        "Virtual Private Network",
+        "Very Protected Network",
+        "Verified Personal Network",
+        "Virtual Public Network"
+      ],
+      "correctAnswer": 0
+    }
+  ]
+}
