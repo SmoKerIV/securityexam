@@ -14,16 +14,12 @@ interface QuizData {
   questions: Question[]
 }
 
-const props = defineProps<{
-  quizData: QuizData | null
-}>()
-
 const selectedAnswers = ref<Record<number, number>>({})
 const showFinalResults = ref(false)
 const uploadedQuizData = ref<QuizData | null>(null)
 
-// Use uploaded quiz data if available, otherwise use props
-const currentQuizData = computed(() => uploadedQuizData.value || props.quizData)
+// Only use uploaded quiz data
+const currentQuizData = computed(() => uploadedQuizData.value)
 
 const selectAnswer = (questionId: number, answerIndex: number) => {
   selectedAnswers.value[questionId] = answerIndex
@@ -52,7 +48,7 @@ const resetQuiz = () => {
   showFinalResults.value = false
 }
 
-const resetToOriginal = () => {
+const clearQuiz = () => {
   uploadedQuizData.value = null
   selectedAnswers.value = {}
   showFinalResults.value = false
@@ -145,10 +141,10 @@ const isSelected = (questionId: number, optionIndex: number) => {
         />
         <button 
           v-if="uploadedQuizData" 
-          @click="resetToOriginal" 
+          @click="clearQuiz" 
           class="back-btn"
         >
-          ↩️ Back to Original Quiz
+          ↩️ Clear Quiz
         </button>
       </div>
       <p class="upload-note">Upload a JSON file with your own quiz questions</p>
@@ -205,12 +201,47 @@ const isSelected = (questionId: number, optionIndex: number) => {
       </div>
       
       <button class="reset-btn" @click="resetQuiz">Try Again</button>
-      <button class="back-btn" v-if="uploadedQuizData" @click="resetToOriginal">Back to Original Quiz</button>
+      <button class="back-btn" v-if="uploadedQuizData" @click="clearQuiz">Clear Quiz</button>
     </div>
   </div>
   
-  <div class="loading" v-else>
-    <p>Loading quiz...</p>
+  <div class="no-quiz" v-else>
+    <div class="upload-prompt">
+      <h2>📚 Welcome to the Quiz Platform</h2>
+      <p>Upload a JSON file to start your quiz</p>
+      
+      <div class="upload-section">
+        <label for="quiz-upload" class="upload-btn-large">
+          📁 Upload Quiz File (JSON)
+        </label>
+        <input 
+          id="quiz-upload" 
+          type="file" 
+          @change="handleFileUpload" 
+          accept=".json" 
+          style="display: none;" 
+        />
+      </div>
+      
+      <div class="format-info">
+        <h3>Expected JSON Format:</h3>
+        <pre class="format-example">{
+  "title": "Your Quiz Title",
+  "description": "Quiz description",
+  "questions": [
+    {
+      "id": 1,
+      "question": "Your question?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": 2
+    }
+  ]
+}</pre>
+        <p class="format-note">
+          <strong>Note:</strong> correctAnswer is the index (0-based) of the correct option
+        </p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -514,5 +545,54 @@ const isSelected = (questionId: number, optionIndex: number) => {
   font-size: 0.9rem;
   text-align: center;
   margin-top: 10px;
+}
+
+.no-quiz {
+  text-align: center;
+  padding: 50px;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.upload-prompt {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.upload-prompt h2 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.upload-prompt p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.upload-btn-large {
+  padding: 15px 30px;
+  font-size: 1.2rem;
+}
+
+.format-info {
+  text-align: left;
+  margin-top: 20px;
+}
+
+.format-example {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+}
+
+.format-note {
+  margin-top: 10px;
+  color: #666;
+  font-size: 0.9rem;
 }
 </style>

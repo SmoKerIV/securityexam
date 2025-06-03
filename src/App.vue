@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import SecurityHeader from './components/SecurityHeader.vue'
 import QuizComponent from './components/QuizComponent.vue'
 
@@ -18,22 +18,7 @@ interface QuizData {
 
 const quizData = ref<QuizData | null>(null)
 
-const loadQuizData = async () => {
-  try {
-    const response = await fetch('/quiz.json')
-    if (response.ok) {
-      quizData.value = await response.json()
-    } else {
-      console.error('Could not load quiz.json file')
-    }
-  } catch (error) {
-    console.error('Failed to fetch quiz data:', error)
-  }
-}
-
-onMounted(() => {
-  loadQuizData()
-})
+// Remove the original quiz loading - only use uploaded files
 </script>
 
 <template>
