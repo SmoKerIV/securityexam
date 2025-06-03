@@ -20,12 +20,16 @@ const props = defineProps<{
 
 const selectedAnswers = ref<Record<number, number>>({})
 const showFinalResults = ref(false)
+const uploadedQuizData = ref<QuizData | null>(null)
+
+// Use uploaded quiz data if available, otherwise use props
+const currentQuizData = computed(() => uploadedQuizData.value || props.quizData)
 
 const selectAnswer = (questionId: number, answerIndex: number) => {
   selectedAnswers.value[questionId] = answerIndex
   
   // Show final results if all questions are answered
-  if (props.quizData && Object.keys(selectedAnswers.value).length === props.quizData.questions.length) {
+  if (currentQuizData.value && Object.keys(selectedAnswers.value).length === currentQuizData.value.questions.length) {
     setTimeout(() => {
       showFinalResults.value = true
     }, 500) // Small delay to show the last answer feedback
@@ -33,9 +37,9 @@ const selectAnswer = (questionId: number, answerIndex: number) => {
 }
 
 const score = computed(() => {
-  if (!props.quizData) return 0
+  if (!currentQuizData.value) return 0
   let correct = 0
-  props.quizData.questions.forEach(question => {
+  currentQuizData.value.questions.forEach(question => {
     if (selectedAnswers.value[question.id] === question.correctAnswer) {
       correct++
     }
@@ -48,13 +52,67 @@ const resetQuiz = () => {
   showFinalResults.value = false
 }
 
+const resetToOriginal = () => {
+  uploadedQuizData.value = null
+  selectedAnswers.value = {}
+  showFinalResults.value = false
+}
+
+const handleFileUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  
+  if (!file) return
+  
+  if (file.type !== 'application/json') {
+    alert('Please upload a JSON file')
+    return
+  }
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const result = e.target?.result as string
+      const jsonData = JSON.parse(result)
+      
+      // Validate the JSON structure
+      if (!jsonData.title || !jsonData.questions || !Array.isArray(jsonData.questions)) {
+        alert('Invalid quiz format. Please ensure your JSON has "title" and "questions" array.')
+        return
+      }
+      
+      // Validate each question has required fields
+      const isValid = jsonData.questions.every((q: any) => 
+        q.id && q.question && Array.isArray(q.options) && typeof q.correctAnswer === 'number'
+      )
+      
+      if (!isValid) {
+        alert('Invalid question format. Each question must have id, question, options array, and correctAnswer number.')
+        return
+      }
+      
+      uploadedQuizData.value = jsonData
+      selectedAnswers.value = {}
+      showFinalResults.value = false
+      
+      // Clear the file input
+      target.value = ''
+      
+    } catch (error) {
+      alert('Error parsing JSON file. Please check the file format.')
+    }
+  }
+  
+  reader.readAsText(file)
+}
+
 const isAnswered = (questionId: number) => {
   return selectedAnswers.value[questionId] !== undefined
 }
 
 const isCorrect = (questionId: number, optionIndex: number) => {
-  if (!props.quizData) return false
-  const question = props.quizData.questions.find(q => q.id === questionId)
+  if (!currentQuizData.value) return false
+  const question = currentQuizData.value.questions.find(q => q.id === questionId)
   return question && question.correctAnswer === optionIndex
 }
 
@@ -64,18 +122,41 @@ const isSelected = (questionId: number, optionIndex: number) => {
 </script>
 
 <template>
-  <div class="quiz-container" v-if="quizData">
+  <div class="quiz-container" v-if="currentQuizData">
     <div class="quiz-header">
-      <h1>{{ quizData.title }}</h1>
-      <p>{{ quizData.description }}</p>
+      <h1>{{ currentQuizData.title }}</h1>
+      <p>{{ currentQuizData.description }}</p>
       <div class="progress">
-        <span>Progress: {{ Object.keys(selectedAnswers).length }} / {{ quizData.questions.length }}</span>
+        <span>Progress: {{ Object.keys(selectedAnswers).length }} / {{ currentQuizData.questions.length }}</span>
       </div>
+    </div>
+
+    <div class="file-upload" v-if="!showFinalResults">
+      <div class="upload-section">
+        <label for="quiz-upload" class="upload-btn">
+          📁 Upload Custom Quiz (JSON)
+        </label>
+        <input 
+          id="quiz-upload" 
+          type="file" 
+          @change="handleFileUpload" 
+          accept=".json" 
+          style="display: none;" 
+        />
+        <button 
+          v-if="uploadedQuizData" 
+          @click="resetToOriginal" 
+          class="back-btn"
+        >
+          ↩️ Back to Original Quiz
+        </button>
+      </div>
+      <p class="upload-note">Upload a JSON file with your own quiz questions</p>
     </div>
 
     <div class="questions" v-if="!showFinalResults">
       <div 
-        v-for="question in quizData.questions" 
+        v-for="question in currentQuizData.questions" 
         :key="question.id" 
         class="question"
         :class="{ 'answered': isAnswered(question.id) }"
@@ -119,11 +200,12 @@ const isSelected = (questionId: number, optionIndex: number) => {
     <div class="final-results" v-if="showFinalResults">
       <h2>Quiz Complete!</h2>
       <div class="score">
-        <p>Final Score: {{ score }} out of {{ quizData.questions.length }}</p>
-        <p class="percentage">{{ Math.round((score / quizData.questions.length) * 100) }}%</p>
+        <p>Final Score: {{ score }} out of {{ currentQuizData.questions.length }}</p>
+        <p class="percentage">{{ Math.round((score / currentQuizData.questions.length) * 100) }}%</p>
       </div>
       
       <button class="reset-btn" @click="resetQuiz">Try Again</button>
+      <button class="back-btn" v-if="uploadedQuizData" @click="resetToOriginal">Back to Original Quiz</button>
     </div>
   </div>
   
@@ -370,5 +452,67 @@ const isSelected = (questionId: number, optionIndex: number) => {
 .final-results h2 {
   color: #333;
   margin-bottom: 20px;
+}
+
+.file-upload {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.file-upload input {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+.file-upload .note {
+  margin-top: 10px;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-btn {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.upload-btn:hover {
+  transform: translateY(-2px);
+}
+
+.back-btn {
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #ccc;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.back-btn:hover {
+  background-color: #e2e6ea;
+}
+
+.upload-note {
+  color: #666;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-top: 10px;
 }
 </style>
