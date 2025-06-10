@@ -16,7 +16,6 @@ interface QuizData {
   questions: Question[]
 }
 
-const quizData = ref<QuizData | null>(null)
 const uploadedQuizData = ref<QuizData | null>(null)
 
 // Handle shared quiz loading from URL

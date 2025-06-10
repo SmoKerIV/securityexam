@@ -77,7 +77,7 @@ const copyToClipboard = async () => {
 
                 <div class="share-url-container">
                     <div class="url-input-wrapper">
-                        <input v-model="shareUrl" readonly class="share-url-input" @click="$event.target.select()"
+                        <input v-model="shareUrl" readonly class="share-url-input" @click="($event.target as HTMLInputElement)?.select()"
                             placeholder="Share link will appear here..." />
                         <span class="input-icon">🔗</span>
                     </div>
