@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import QuizHeader from './quiz/QuizHeader.vue'
+import QuizActions from './quiz/QuizActions.vue'
+import QuizQuestion from './quiz/QuizQuestion.vue'
+import QuizResults from './quiz/QuizResults.vue'
+import SavedQuizzesList from './quiz/SavedQuizzesList.vue'
+import ShareQuiz from './ShareQuiz.vue'
+import Modal from './ui/Modal.vue'
 
 interface Question {
   id: number
@@ -14,16 +21,35 @@ interface QuizData {
   questions: Question[]
 }
 
+const props = defineProps<{
+  quizData: QuizData | null
+}>()
+
 const selectedAnswers = ref<Record<number, number>>({})
 const showFinalResults = ref(false)
 const uploadedQuizData = ref<QuizData | null>(null)
+const savedQuizzes = ref<Array<{ id: string, title: string, fileName: string }>>([])
+const showSavedQuizzes = ref(false)
+const showSharePopup = ref(false)
 
-// Only use uploaded quiz data
-const currentQuizData = computed(() => uploadedQuizData.value)
+// Load saved quizzes from localStorage on component mount
+onMounted(() => {
+  loadSavedQuizzes()
+
+  const urlParams = new URLSearchParams(window.location.search)
+  const sharedQuizId = urlParams.get('quiz')
+
+  if (sharedQuizId) {
+    loadSavedQuiz(sharedQuizId)
+  }
+})
+
+// Use props quiz data if available, otherwise use uploaded data
+const currentQuizData = computed(() => props.quizData || uploadedQuizData.value)
 
 const selectAnswer = (questionId: number, answerIndex: number) => {
   selectedAnswers.value[questionId] = answerIndex
-  
+
   // Show final results if all questions are answered
   if (currentQuizData.value && Object.keys(selectedAnswers.value).length === currentQuizData.value.questions.length) {
     setTimeout(() => {
@@ -48,57 +74,56 @@ const resetQuiz = () => {
   showFinalResults.value = false
 }
 
-const clearQuiz = () => {
-  uploadedQuizData.value = null
-  selectedAnswers.value = {}
-  showFinalResults.value = false
-}
+const emit = defineEmits<{
+  quizUploaded: [quizData: any]
+}>()
 
 const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
-  
+
   if (!file) return
-  
+
   if (file.type !== 'application/json') {
     alert('Please upload a JSON file')
     return
   }
-  
+
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
       const result = e.target?.result as string
       const jsonData = JSON.parse(result)
-      
+
       // Validate the JSON structure
       if (!jsonData.title || !jsonData.questions || !Array.isArray(jsonData.questions)) {
         alert('Invalid quiz format. Please ensure your JSON has "title" and "questions" array.')
         return
       }
-      
+
       // Validate each question has required fields
-      const isValid = jsonData.questions.every((q: any) => 
+      const isValid = jsonData.questions.every((q: any) =>
         q.id && q.question && Array.isArray(q.options) && typeof q.correctAnswer === 'number'
       )
-      
+
       if (!isValid) {
         alert('Invalid question format. Each question must have id, question, options array, and correctAnswer number.')
         return
       }
-      
+
       uploadedQuizData.value = jsonData
+      emit('quizUploaded', jsonData)
       selectedAnswers.value = {}
       showFinalResults.value = false
-      
+
       // Clear the file input
       target.value = ''
-      
+
     } catch (error) {
       alert('Error parsing JSON file. Please check the file format.')
     }
   }
-  
+
   reader.readAsText(file)
 }
 
@@ -115,114 +140,199 @@ const isCorrect = (questionId: number, optionIndex: number) => {
 const isSelected = (questionId: number, optionIndex: number) => {
   return selectedAnswers.value[questionId] === optionIndex
 }
+
+const loadSavedQuizzes = () => {
+  const saved = localStorage.getItem('savedQuizzes')
+  if (saved) {
+    savedQuizzes.value = JSON.parse(saved)
+  }
+}
+
+const saveQuiz = () => {
+  if (!currentQuizData.value) return
+
+  const quizId = Date.now().toString()
+  const fileName = `quiz_${quizId}.json`
+
+  // Save to localStorage
+  const quizData = JSON.stringify(currentQuizData.value, null, 2)
+  localStorage.setItem(`quiz_${quizId}`, quizData)
+
+  // Add to saved quizzes list
+  const quizInfo = {
+    id: quizId,
+    title: currentQuizData.value.title,
+    fileName: fileName
+  }
+
+  savedQuizzes.value.push(quizInfo)
+  localStorage.setItem('savedQuizzes', JSON.stringify(savedQuizzes.value))
+
+  alert(`Quiz saved successfully! ID: ${quizId}`)
+}
+
+const loadSavedQuiz = (quizId: string) => {
+  const savedQuiz = localStorage.getItem(`quiz_${quizId}`)
+  if (savedQuiz) {
+    uploadedQuizData.value = JSON.parse(savedQuiz)
+    selectedAnswers.value = {}
+    showFinalResults.value = false
+    showSavedQuizzes.value = false
+  }
+}
+
+const deleteSavedQuiz = (quizId: string) => {
+  // Remove from localStorage
+  localStorage.removeItem(`quiz_${quizId}`)
+
+  // Remove from saved quizzes list
+  savedQuizzes.value = savedQuizzes.value.filter(quiz => quiz.id !== quizId)
+  localStorage.setItem('savedQuizzes', JSON.stringify(savedQuizzes.value))
+}
+
+const downloadQuiz = (quizId: string) => {
+  const savedQuiz = localStorage.getItem(`quiz_${quizId}`)
+  if (savedQuiz) {
+    try {
+      const blob = new Blob([savedQuiz], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+
+      // Use a cleaner download approach
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `quiz_${quizId}.json`
+      link.click()
+
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Download failed:', error)
+    }
+  }
+}
+
+const copyShareLink = (quizId: string) => {
+  const baseUrl = window.location.origin + window.location.pathname
+  const shareUrl = `${baseUrl}?quiz=${quizId}`
+
+  navigator.clipboard.writeText(shareUrl).then(() => {
+    alert('Share link copied to clipboard!')
+  }).catch(() => {
+    // Fallback for browsers that don't support clipboard API
+    prompt('Copy this link to share:', shareUrl)
+  })
+}
+
+const exportCurrentQuiz = () => {
+  if (!currentQuizData.value) return
+
+  try {
+    const dataStr = JSON.stringify(currentQuizData.value, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+
+    // Use a cleaner download approach
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${currentQuizData.value.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`
+    link.click()
+
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Export failed:', error)
+  }
+}
+
+const shareCurrentQuiz = () => {
+  if (currentQuizData.value) {
+    showSharePopup.value = true
+  }
+}
+
+// Event handlers for child components
+const handleSelectAnswer = (questionId: number, answerIndex: number) => {
+  selectAnswer(questionId, answerIndex)
+}
+
+const handleUploadFile = (event: Event) => {
+  handleFileUpload(event)
+}
+
+const handleShowSavedQuizzes = () => {
+  showSavedQuizzes.value = true
+}
+
+const handleSaveQuiz = () => {
+  saveQuiz()
+}
+
+const handleExportQuiz = () => {
+  exportCurrentQuiz()
+}
+
+const handleShareQuiz = () => {
+  showSharePopup.value = true
+}
+
+const handleResetQuiz = () => {
+  resetQuiz()
+}
+
+const handleLoadQuiz = (quizId: string) => {
+  loadSavedQuiz(quizId)
+}
+
+const handleDownloadQuiz = (quizId: string) => {
+  downloadQuiz(quizId)
+}
+
+const handleShareSavedQuiz = (quizId: string) => {
+  copyShareLink(quizId)
+}
+
+const handleDeleteQuiz = (quizId: string) => {
+  deleteSavedQuiz(quizId)
+}
 </script>
 
 <template>
   <div class="quiz-container" v-if="currentQuizData">
-    <div class="quiz-header">
-      <h1>{{ currentQuizData.title }}</h1>
-      <p>{{ currentQuizData.description }}</p>
-      <div class="progress">
-        <span>Progress: {{ Object.keys(selectedAnswers).length }} / {{ currentQuizData.questions.length }}</span>
-      </div>
-    </div>
+    <QuizHeader :title="currentQuizData.title" :description="currentQuizData.description"
+      :progress="Object.keys(selectedAnswers).length" :total="currentQuizData.questions.length" />
 
-    <div class="file-upload" v-if="!showFinalResults">
-      <div class="upload-section">
-        <label for="quiz-upload" class="upload-btn">
-          📁 Upload Custom Quiz (JSON)
-        </label>
-        <input 
-          id="quiz-upload" 
-          type="file" 
-          @change="handleFileUpload" 
-          accept=".json" 
-          style="display: none;" 
-        />
-        <button 
-          v-if="uploadedQuizData" 
-          @click="clearQuiz" 
-          class="back-btn"
-        >
-          ↩️ Clear Quiz
-        </button>
-      </div>
-      <p class="upload-note">Upload a JSON file with your own quiz questions</p>
-    </div>
+    <QuizActions v-if="!showFinalResults" @uploadFile="handleUploadFile" @showSavedQuizzes="handleShowSavedQuizzes"
+      @saveQuiz="handleSaveQuiz" @exportQuiz="handleExportQuiz" @shareQuiz="handleShareQuiz" />
+
+    <!-- Share Popup -->
+    <Modal :show="showSharePopup" title="Share Quiz" max-width="500px" @close="showSharePopup = false">
+      <ShareQuiz :quiz-data="currentQuizData" />
+    </Modal>
 
     <div class="questions" v-if="!showFinalResults">
-      <div 
-        v-for="question in currentQuizData.questions" 
-        :key="question.id" 
-        class="question"
-        :class="{ 'answered': isAnswered(question.id) }"
-      >
-        <h3>{{ question.id }}. {{ question.question }}</h3>
-        <div class="options">
-          <label 
-            v-for="(option, index) in question.options" 
-            :key="index"
-            class="option"
-            :class="{
-              'correct': isAnswered(question.id) && isCorrect(question.id, index),
-              'incorrect': isAnswered(question.id) && isSelected(question.id, index) && !isCorrect(question.id, index),
-              'disabled': isAnswered(question.id)
-            }"
-          >
-            <input 
-              type="radio" 
-              :name="`question-${question.id}`"
-              :value="index"
-              :disabled="isAnswered(question.id)"
-              @change="selectAnswer(question.id, index)"
-            />
-            <span>{{ option }}</span>
-            <span v-if="isAnswered(question.id) && isCorrect(question.id, index)" class="feedback correct-mark">✓</span>
-            <span v-if="isAnswered(question.id) && isSelected(question.id, index) && !isCorrect(question.id, index)" class="feedback incorrect-mark">✗</span>
-          </label>
-        </div>
-        
-        <div v-if="isAnswered(question.id)" class="instant-feedback">
-          <p v-if="selectedAnswers[question.id] === question.correctAnswer" class="correct-feedback">
-            ✓ Correct!
-          </p>
-          <p v-else class="incorrect-feedback">
-            ✗ Incorrect. The correct answer is: {{ question.options[question.correctAnswer] }}
-          </p>
-        </div>
-      </div>
+      <QuizQuestion v-for="question in currentQuizData.questions" :key="question.id" :question="question"
+        :selected-answer="selectedAnswers[question.id]" :is-answered="isAnswered(question.id)"
+        @selectAnswer="(answerIndex) => handleSelectAnswer(question.id, answerIndex)" />
     </div>
 
-    <div class="final-results" v-if="showFinalResults">
-      <h2>Quiz Complete!</h2>
-      <div class="score">
-        <p>Final Score: {{ score }} out of {{ currentQuizData.questions.length }}</p>
-        <p class="percentage">{{ Math.round((score / currentQuizData.questions.length) * 100) }}%</p>
-      </div>
-      
-      <button class="reset-btn" @click="resetQuiz">Try Again</button>
-      <button class="back-btn" v-if="uploadedQuizData" @click="clearQuiz">Clear Quiz</button>
-    </div>
+    <QuizResults v-if="showFinalResults" :score="score" :total="currentQuizData.questions.length"
+      @resetQuiz="handleResetQuiz" @saveQuiz="handleSaveQuiz" @exportQuiz="handleExportQuiz"
+      @shareQuiz="handleShareQuiz" @showSavedQuizzes="handleShowSavedQuizzes" />
   </div>
-  
+
   <div class="no-quiz" v-else>
     <div class="upload-prompt">
       <h2>📚 Welcome to the Quiz Platform</h2>
-      <p>Upload a JSON file to start your quiz</p>
-      
+      <p>Upload a JSON file to start your quiz or load a saved quiz</p>
+
       <div class="upload-section">
         <label for="quiz-upload" class="upload-btn-large">
           📁 Upload Quiz File (JSON)
         </label>
-        <input 
-          id="quiz-upload" 
-          type="file" 
-          @change="handleFileUpload" 
-          accept=".json" 
-          style="display: none;" 
-        />
+        <input id="quiz-upload" type="file" @change="handleFileUpload" accept=".json" style="display: none;" />
+        <button @click="showSavedQuizzes = true" class="saved-btn-large">
+          📂 Load Saved Quiz
+        </button>
       </div>
-      
+
       <div class="format-info">
         <h3>Expected JSON Format:</h3>
         <pre class="format-example">{
@@ -243,356 +353,239 @@ const isSelected = (questionId: number, optionIndex: number) => {
       </div>
     </div>
   </div>
+
+  <!-- Saved Quizzes Modal -->
+  <Modal :show="showSavedQuizzes" title="Saved Quizzes" @close="showSavedQuizzes = false">
+    <SavedQuizzesList :quizzes="savedQuizzes" @loadQuiz="handleLoadQuiz" @downloadQuiz="handleDownloadQuiz"
+      @shareQuiz="handleShareSavedQuiz" @deleteQuiz="handleDeleteQuiz" />
+  </Modal>
 </template>
 
 <style scoped>
 .quiz-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.quiz-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.quiz-header h1 {
-    color: #333;
-    margin-bottom: 10px;
-}
-
-.quiz-header p {
-    color: #666;
-    font-size: 1.1rem;
-}
-
-.progress {
-  margin-top: 10px;
-  padding: 10px;
-  background: rgba(102, 126, 234, 0.1);
-  border-radius: 5px;
-  color: #667eea;
-  font-weight: bold;
-}
-
-.question {
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.question.answered {
-  border-left: 4px solid #667eea;
-}
-
-.question h3 {
-    color: #333;
-    margin-bottom: 15px;
-    font-size: 1.2rem;
-}
-
-.options {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.option {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.option:hover {
-    background-color: #f8f9fa;
-}
-
-.option input[type="radio"] {
-    margin: 0;
-}
-
-.option span {
-    color: #333;
-    font-size: 1rem;
-}
-
-.option.correct {
-  background-color: #d4edda;
-  border: 2px solid #28a745;
-}
-
-.option.incorrect {
-  background-color: #f8d7da;
-  border: 2px solid #dc3545;
-}
-
-.option.disabled {
-  cursor: not-allowed;
-  opacity: 0.8;
-}
-
-.option.disabled input {
-  cursor: not-allowed;
-}
-
-.submit-btn,
-.reset-btn {
-    background: linear-gradient(45deg, #667eea, #764ba2);
-    color: white;
-    border: none;
-    padding: 15px 30px;
-    border-radius: 10px;
-    font-size: 1.1rem;
-    cursor: pointer;
-    margin-top: 20px;
-    transition: transform 0.2s;
-}
-
-.submit-btn:hover,
-.reset-btn:hover {
-    transform: translateY(-2px);
-}
-
-.submit-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.results {
-    text-align: center;
-}
-
-.score {
-    background: white;
-    border-radius: 10px;
-    padding: 30px;
-    margin-bottom: 30px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.score p {
-    font-size: 1.5rem;
-    color: #333;
-    margin-bottom: 10px;
-}
-
-.percentage {
-    font-size: 2rem !important;
-    font-weight: bold;
-    color: #667eea;
-}
-
-.answer-review {
-    text-align: left;
-    margin-bottom: 20px;
-}
-
-.answer-review h3 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #333;
-}
-
-.question-review {
-    background: white;
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.question-review h4 {
-    color: #333;
-    margin-bottom: 10px;
-}
-
-.correct-answer {
-    color: #28a745;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.user-answer {
-    margin-bottom: 0;
-}
-
-.user-answer.correct {
-    color: #28a745;
-    font-weight: bold;
-}
-
-.user-answer.incorrect {
-    color: #dc3545;
-    font-weight: bold;
-}
-
-.loading {
-    text-align: center;
-    padding: 50px;
-    font-size: 1.2rem;
-    color: #666;
-}
-
-.feedback {
-  margin-left: auto;
-  font-weight: bold;
-  font-size: 1.2rem;
-}
-
-.correct-mark {
-  color: #28a745;
-}
-
-.incorrect-mark {
-  color: #dc3545;
-}
-
-.instant-feedback {
-  margin-top: 15px;
-  padding: 10px;
-  border-radius: 5px;
-  font-weight: bold;
-}
-
-.correct-feedback {
-  color: #28a745;
-  background-color: #d4edda;
-  border: 1px solid #c3e6cb;
-}
-
-.incorrect-feedback {
-  color: #721c24;
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
-}
-
-.final-results {
-  text-align: center;
-  padding: 30px;
-}
-
-.final-results h2 {
-  color: #333;
-  margin-bottom: 20px;
-}
-
-.file-upload {
-  text-align: center;
-  margin-top: 20px;
-}
-
-.file-upload input {
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.file-upload .note {
-  margin-top: 10px;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.upload-section {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
 }
 
-.upload-btn {
-  background: linear-gradient(45deg, #667eea, #764ba2);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.upload-btn:hover {
-  transform: translateY(-2px);
-}
-
-.back-btn {
-  background: #f8f9fa;
-  color: #333;
-  border: 1px solid #ccc;
-  padding: 10px 20px;
-  border-radius: 5px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.back-btn:hover {
-  background-color: #e2e6ea;
-}
-
-.upload-note {
-  color: #666;
-  font-size: 0.9rem;
-  text-align: center;
-  margin-top: 10px;
+.questions {
+  display: flex;
+  flex-direction: column;
 }
 
 .no-quiz {
   text-align: center;
-  padding: 50px;
-  font-size: 1.2rem;
-  color: #666;
+  padding: 60px 20px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 200px);
 }
 
 .upload-prompt {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
-  padding: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-prompt::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.upload-prompt>* {
+  position: relative;
+  z-index: 1;
 }
 
 .upload-prompt h2 {
-  color: #333;
-  margin-bottom: 15px;
+  color: #f1f5f9;
+  margin-bottom: 16px;
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .upload-prompt p {
-  color: #666;
-  margin-bottom: 20px;
+  color: #cbd5e1;
+  margin-bottom: 32px;
+  font-size: 1.2rem;
+  line-height: 1.6;
 }
 
-.upload-btn-large {
-  padding: 15px 30px;
-  font-size: 1.2rem;
+.upload-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.upload-btn-large,
+.saved-btn-large {
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 200px;
+  justify-content: center;
+}
+
+.upload-btn-large:hover,
+.saved-btn-large:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 35px rgba(59, 130, 246, 0.6);
 }
 
 .format-info {
   text-align: left;
-  margin-top: 20px;
+  margin-top: 32px;
+  background: rgba(30, 41, 59, 0.8);
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.format-info h3 {
+  color: #f1f5f9;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.format-info h3::before {
+  content: "📋";
+  font-size: 1.2em;
 }
 
 .format-example {
-  background: #f8f9fa;
-  padding: 10px;
-  border-radius: 5px;
+  background: rgba(51, 65, 85, 0.8);
+  padding: 20px;
+  border-radius: 12px;
   overflow-x: auto;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #e2e8f0;
+  position: relative;
+}
+
+.format-example::before {
+  content: 'JSON';
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: rgba(59, 130, 246, 0.8);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .format-note {
-  margin-top: 10px;
-  color: #666;
-  font-size: 0.9rem;
+  margin-top: 16px;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 12px;
+  border-left: 4px solid #60a5fa;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.format-note::before {
+  content: "💡";
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+.format-note strong {
+  color: #60a5fa;
+}
+
+@media (max-width: 768px) {
+  .upload-prompt {
+    padding: 30px 20px;
+    margin: 20px;
+  }
+
+  .upload-prompt h2 {
+    font-size: 2rem;
+  }
+
+  .upload-prompt p {
+    font-size: 1.1rem;
+  }
+
+  .upload-section {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .upload-btn-large,
+  .saved-btn-large {
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 1rem;
+  }
+
+  .format-info {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .upload-prompt h2 {
+    font-size: 1.8rem;
+  }
+
+  .upload-prompt p {
+    font-size: 1rem;
+  }
+
+  .format-example {
+    font-size: 0.8rem;
+    padding: 16px;
+  }
 }
 </style>

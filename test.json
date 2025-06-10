@@ -1,0 +1,51 @@
+{
+    "title": "Security+ Basic Quiz",
+    "description": "A short multiple-choice quiz to test your basic knowledge of Security+ concepts.",
+    "questions": [
+      {
+        "id": 1,
+        "question": "What is the main purpose of a firewall?",
+        "options": [
+          "To encrypt data",
+          "To block physical access",
+          "To monitor and filter network traffic",
+          "To scan for malware"
+        ],
+        "correctAnswer": 2
+      },
+      {
+        "id": 2,
+        "question": "Which type of malware is designed to demand payment from the victim?",
+        "options": [
+          "Worm",
+          "Ransomware",
+          "Trojan",
+          "Spyware"
+        ],
+        "correctAnswer": 1
+      },
+      {
+        "id": 3,
+        "question": "What does CIA stand for in cybersecurity?",
+        "options": [
+          "Central Intelligence Agency",
+          "Confidentiality, Integrity, Availability",
+          "Code Injection Analysis",
+          "Cybersecurity Information Association"
+        ],
+        "correctAnswer": 1
+      },
+      {
+        "id": 4,
+        "question": "What is the strongest form of user authentication?",
+        "options": [
+          "Username and password",
+          "Two-factor authentication",
+          "Security questions",
+          "Email verification"
+        ],
+        "correctAnswer": 1
+      }
+    ]
+  }
+  
