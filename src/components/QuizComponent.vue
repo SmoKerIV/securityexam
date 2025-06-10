@@ -131,16 +131,6 @@ const isAnswered = (questionId: number) => {
   return selectedAnswers.value[questionId] !== undefined
 }
 
-const isCorrect = (questionId: number, optionIndex: number) => {
-  if (!currentQuizData.value) return false
-  const question = currentQuizData.value.questions.find(q => q.id === questionId)
-  return question && question.correctAnswer === optionIndex
-}
-
-const isSelected = (questionId: number, optionIndex: number) => {
-  return selectedAnswers.value[questionId] === optionIndex
-}
-
 const loadSavedQuizzes = () => {
   const saved = localStorage.getItem('savedQuizzes')
   if (saved) {
@@ -239,12 +229,6 @@ const exportCurrentQuiz = () => {
     URL.revokeObjectURL(url)
   } catch (error) {
     console.error('Export failed:', error)
-  }
-}
-
-const shareCurrentQuiz = () => {
-  if (currentQuizData.value) {
-    showSharePopup.value = true
   }
 }
 
