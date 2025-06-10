@@ -28,22 +28,6 @@ const compressQuizData = (quizData: any): string => {
     return JSON.stringify(compressed)
 }
 
-// Simple decompression function
-const decompressQuizData = (compressedData: string): any => {
-    const compressed = JSON.parse(compressedData)
-
-    return {
-        title: compressed.t,
-        description: compressed.d,
-        questions: compressed.q.map((q: any) => ({
-            id: q.i,
-            question: q.q,
-            options: q.o,
-            correctAnswer: q.a
-        }))
-    }
-}
-
 const generateShareLink = () => {
     if (!props.quizData) return
 
