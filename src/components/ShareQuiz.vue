@@ -116,10 +116,6 @@ const copyToClipboard = async () => {
                         <span class="info-icon">🌐</span>
                         <span>Works across all devices and browsers</span>
                     </div>
-                    <div class="info-item">
-                        <span class="info-icon">⚡</span>
-                        <span>Compressed for shorter, more shareable links</span>
-                    </div>
                 </div>
             </div>
         </transition>
