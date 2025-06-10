@@ -11,24 +11,60 @@ const isSharing = ref(false)
 const shareUrl = ref('')
 const showShareUrl = ref(false)
 
+// Simple compression function to reduce JSON size
+const compressQuizData = (quizData: any): string => {
+    // Create a more compact representation
+    const compressed = {
+        t: quizData.title,
+        d: quizData.description,
+        q: quizData.questions.map((question: any) => ({
+            i: question.id,
+            q: question.question,
+            o: question.options,
+            a: question.correctAnswer
+        }))
+    }
+
+    return JSON.stringify(compressed)
+}
+
+// Simple decompression function
+const decompressQuizData = (compressedData: string): any => {
+    const compressed = JSON.parse(compressedData)
+
+    return {
+        title: compressed.t,
+        description: compressed.d,
+        questions: compressed.q.map((q: any) => ({
+            id: q.i,
+            question: q.q,
+            options: q.o,
+            correctAnswer: q.a
+        }))
+    }
+}
+
 const generateShareLink = () => {
     if (!props.quizData) return
 
     isSharing.value = true
 
     try {
-        // Encode the quiz data in base64 and add to URL
-        const quizJson = JSON.stringify(props.quizData)
-        const encodedQuiz = btoa(encodeURIComponent(quizJson))
-        const baseUrl = window.location.origin + window.location.pathname
-        shareUrl.value = `${baseUrl}?data=${encodedQuiz}`
+        // Compress the quiz data first
+        const compressedJson = compressQuizData(props.quizData)
 
-        // Show the URL immediately instead of trying to copy first
+        // Use LZ-string style compression or just base64 with shorter keys
+        const encodedQuiz = btoa(compressedJson)
+
+        // Use a shorter parameter name
+        const baseUrl = window.location.origin + window.location.pathname
+        shareUrl.value = `${baseUrl}?q=${encodedQuiz}`
+
+        // Show the URL immediately
         showShareUrl.value = true
 
-        // Try to copy to clipboard but don't depend on it
+        // Try to copy to clipboard
         navigator.clipboard.writeText(shareUrl.value).catch(() => {
-            // Silently fail - user can still copy manually
             console.log('Clipboard access not available')
         })
     } catch (error) {
@@ -47,7 +83,7 @@ const copyToClipboard = async () => {
         if (btn) {
             btn.textContent = 'Copied!'
             setTimeout(() => {
-                btn.textContent = 'Copy'
+                btn.textContent = '📋 Copy'
             }, 2000)
         }
     } catch (error) {
@@ -72,7 +108,7 @@ const copyToClipboard = async () => {
             <div v-if="showShareUrl" class="share-link-area">
                 <div class="success-header">
                     <span class="success-icon">✨</span>
-                    <p class="success-text">Share link generated!</p>
+                    <p class="success-text">Compressed share link generated!</p>
                 </div>
 
                 <div class="share-url-container">
@@ -91,6 +127,14 @@ const copyToClipboard = async () => {
                     <div class="info-item">
                         <span class="info-icon">👥</span>
                         <span>Anyone with this link can take the same exam</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🌐</span>
+                        <span>Works across all devices and browsers</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">⚡</span>
+                        <span>Compressed for shorter, more shareable links</span>
                     </div>
                 </div>
             </div>
@@ -305,6 +349,12 @@ const copyToClipboard = async () => {
     background: rgba(15, 23, 42, 0.6);
     border-radius: 6px;
     border-left: 3px solid #10b981;
+}
+
+.info-item.warning {
+    border-left-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
 }
 
 /* Transition animations */

@@ -200,16 +200,53 @@ const downloadQuiz = (quizId: string) => {
   }
 }
 
-const copyShareLink = (quizId: string) => {
-  const baseUrl = window.location.origin + window.location.pathname
-  const shareUrl = `${baseUrl}?quiz=${quizId}`
+const compressQuizData = (quizData: any): string => {
+  const compressed = {
+    t: quizData.title,
+    d: quizData.description,
+    q: quizData.questions.map((question: any) => ({
+      i: question.id,
+      q: question.question,
+      o: question.options,
+      a: question.correctAnswer
+    }))
+  }
 
-  navigator.clipboard.writeText(shareUrl).then(() => {
-    alert('Share link copied to clipboard!')
-  }).catch(() => {
-    // Fallback for browsers that don't support clipboard API
-    prompt('Copy this link to share:', shareUrl)
-  })
+  return JSON.stringify(compressed)
+}
+
+const generateShortId = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+const copyShareLink = (quizId: string) => {
+  const savedQuiz = localStorage.getItem(`quiz_${quizId}`)
+  if (savedQuiz) {
+    try {
+      const quizData = JSON.parse(savedQuiz)
+
+      // Compress the quiz data
+      const compressedJson = compressQuizData(quizData)
+      const encodedQuiz = btoa(compressedJson)
+
+      const baseUrl = window.location.origin + window.location.pathname
+      const shareUrl = `${baseUrl}?q=${encodedQuiz}`
+
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('Compressed share link copied to clipboard!')
+      }).catch(() => {
+        prompt('Copy this link to share:', shareUrl)
+      })
+    } catch (error) {
+      console.error('Error generating share link:', error)
+      alert('Error generating share link')
+    }
+  }
 }
 
 const exportCurrentQuiz = () => {

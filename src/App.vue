@@ -18,21 +18,54 @@ interface QuizData {
 
 const uploadedQuizData = ref<QuizData | null>(null)
 
+// Decompression function (matching the one in ShareQuiz)
+const decompressQuizData = (compressedData: string): any => {
+  const compressed = JSON.parse(compressedData)
+
+  return {
+    title: compressed.t,
+    description: compressed.d,
+    questions: compressed.q.map((q: any) => ({
+      id: q.i,
+      question: q.q,
+      options: q.o,
+      correctAnswer: q.a
+    }))
+  }
+}
+
 // Handle shared quiz loading from URL
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search)
-  const encodedData = urlParams.get('data')
 
+  // Check for new compressed format first
+  const compressedData = urlParams.get('q')
+  if (compressedData) {
+    try {
+      const decodedData = atob(compressedData)
+      const sharedQuizData = decompressQuizData(decodedData)
+
+      if (sharedQuizData.title && sharedQuizData.questions && Array.isArray(sharedQuizData.questions)) {
+        uploadedQuizData.value = sharedQuizData
+        window.history.replaceState({}, document.title, window.location.pathname)
+        return
+      }
+    } catch (error) {
+      console.error('Error loading compressed quiz:', error)
+      alert('Invalid shared quiz link')
+      return
+    }
+  }
+
+  // Fallback to old long format for backward compatibility
+  const encodedData = urlParams.get('data')
   if (encodedData) {
     try {
-      // Decode the quiz data from URL
       const decodedData = decodeURIComponent(atob(encodedData))
       const sharedQuizData = JSON.parse(decodedData)
 
-      // Validate the quiz data
       if (sharedQuizData.title && sharedQuizData.questions && Array.isArray(sharedQuizData.questions)) {
         uploadedQuizData.value = sharedQuizData
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname)
       }
     } catch (error) {
