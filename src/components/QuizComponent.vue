@@ -304,6 +304,20 @@ const handleShareSavedQuiz = (quizId: string) => {
 const handleDeleteQuiz = (quizId: string) => {
   deleteSavedQuiz(quizId)
 }
+
+// XSS demonstration
+const xssInput = ref('')
+const xssOutput = ref('')
+
+const handleXssDemo = () => {
+  // Deliberately vulnerable - this demonstrates XSS
+  xssOutput.value = xssInput.value
+}
+
+const clearXssDemo = () => {
+  xssInput.value = ''
+  xssOutput.value = ''
+}
 </script>
 
 <template>
@@ -343,6 +357,55 @@ const handleDeleteQuiz = (quizId: string) => {
         <button @click="showSavedQuizzes = true" class="saved-btn-large">
           📂 Load Saved Quiz
         </button>
+      </div>
+
+      <!-- XSS Demonstration Section -->
+      <div class="xss-demo-section">
+        <h3>⚠️ XSS Vulnerability Demonstration</h3>
+        <p class="xss-warning">
+          <strong>Warning:</strong> This is an intentionally vulnerable input field for educational purposes.
+          Try entering: <code>&lt;img src=x onerror=alert('XSS!')&gt;</code>
+        </p>
+        
+        <div class="xss-input-section">
+          <div class="input-group">
+            <label for="xss-input">Enter potentially malicious content:</label>
+            <input 
+              id="xss-input"
+              v-model="xssInput" 
+              type="text" 
+              class="xss-input"
+              placeholder="Try: <script>alert('XSS!')</script> or <img src=x onerror=alert('XSS!')>"
+            />
+          </div>
+          
+          <div class="xss-buttons">
+            <button @click="handleXssDemo" class="demo-btn" :disabled="!xssInput">
+              🔓 Execute (Unsafe)
+            </button>
+            <button @click="clearXssDemo" class="clear-btn">
+              🧹 Clear
+            </button>
+          </div>
+        </div>
+
+        <div v-if="xssOutput" class="xss-output-section">
+          <h4>Vulnerable Output (Raw HTML):</h4>
+          <div class="xss-output vulnerable" v-html="xssOutput"></div>
+          
+          <h4>Safe Output (Escaped):</h4>
+          <div class="xss-output safe">{{ xssOutput }}</div>
+        </div>
+
+        <div class="xss-explanation">
+          <h4>🛡️ Security Lesson:</h4>
+          <ul>
+            <li><strong>Vulnerability:</strong> The "Unsafe" output uses <code>v-html</code> which executes scripts</li>
+            <li><strong>Protection:</strong> The "Safe" output uses text interpolation <code>{{}}</code> which escapes HTML</li>
+            <li><strong>Best Practice:</strong> Always sanitize user input and avoid <code>v-html</code> with user data</li>
+            <li><strong>Real Impact:</strong> XSS can steal cookies, session tokens, or redirect users to malicious sites</li>
+          </ul>
+        </div>
       </div>
 
       <div class="format-info">
@@ -555,6 +618,186 @@ const handleDeleteQuiz = (quizId: string) => {
   color: #60a5fa;
 }
 
+.xss-demo-section {
+  margin-top: 32px;
+  padding: 24px;
+  background: rgba(127, 29, 29, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+  text-align: left;
+}
+
+.xss-demo-section h3 {
+  color: #fca5a5;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.xss-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+  color: #fbbf24;
+  font-size: 0.9rem;
+}
+
+.xss-warning code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  color: #fcd34d;
+}
+
+.xss-input-section {
+  margin-bottom: 20px;
+}
+
+.input-group {
+  margin-bottom: 12px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.xss-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.xss-input:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.xss-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.demo-btn {
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.demo-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+}
+
+.demo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.clear-btn {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+.clear-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(107, 114, 128, 0.4);
+}
+
+.xss-output-section {
+  margin: 20px 0;
+}
+
+.xss-output-section h4 {
+  color: #e2e8f0;
+  margin: 16px 0 8px 0;
+  font-size: 1rem;
+}
+
+.xss-output {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  min-height: 40px;
+  word-break: break-all;
+}
+
+.xss-output.vulnerable {
+  background: rgba(127, 29, 29, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.xss-output.safe {
+  background: rgba(6, 78, 59, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #34d399;
+}
+
+.xss-explanation {
+  background: rgba(30, 41, 59, 0.8);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  margin-top: 20px;
+}
+
+.xss-explanation h4 {
+  color: #60a5fa;
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+}
+
+.xss-explanation ul {
+  list-style: none;
+  padding: 0;
+}
+
+.xss-explanation li {
+  margin-bottom: 8px;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.xss-explanation code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  color: #fcd34d;
+}
+
 @media (max-width: 768px) {
   .upload-prompt {
     padding: 30px 20px;
@@ -583,6 +826,19 @@ const handleDeleteQuiz = (quizId: string) => {
 
   .format-info {
     padding: 20px;
+  }
+
+  .xss-demo-section {
+    padding: 20px;
+  }
+
+  .xss-buttons {
+    flex-direction: column;
+  }
+
+  .demo-btn,
+  .clear-btn {
+    width: 100%;
   }
 }
 
